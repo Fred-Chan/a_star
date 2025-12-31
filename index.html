@@ -384,6 +384,18 @@
             color: var(--primary);
         }
 
+        .estimate-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--secondary), #fbbf24);
+            color: white;
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: 700;
+            vertical-align: middle;
+            margin-left: 4px;
+        }
+
         .step-info {
             background: linear-gradient(135deg, var(--primary), var(--primary-light));
             color: white;
@@ -884,17 +896,22 @@
                     <div class="info-box">
                         <h4>🎯 核心公式</h4>
                         <div class="formula">
-                            <span>f</span> = <span>g</span> + <span>h</span>
+                            <span>f</span> = <span>g</span> + <span>h*</span>
                         </div>
                         <p>
-                            <strong>g值</strong>：从起点走到这里花了多少步<br>
-                            <strong>h值</strong>：猜测从这里到终点还要走多少步<br>
-                            <strong>f值</strong>：总共预计要走多少步
+                            <strong>g值</strong>：从起点走到这里<em>实际</em>花了多少步 ✓<br>
+                            <strong>h*值</strong>：<em>猜测</em>从这里到终点还要走多少步 <span class="estimate-badge">估计</span><br>
+                            <strong>f值</strong>：总共<em>预计</em>要走多少步
                         </p>
                     </div>
                     <div class="info-box">
+                        <h4>🤔 h*是怎么猜的？</h4>
+                        <p>h*用的是<strong>曼哈顿距离</strong>：假装没有障碍物，只能上下左右走，数一数最少要几步。<br><br>
+                        ⚠️ <strong>注意</strong>：因为忽略了障碍物，所以h*可能比实际距离<strong>更短</strong>（乐观估计）！这样能保证找到的路径一定是最短的。</p>
+                    </div>
+                    <div class="info-box">
                         <h4>💡 聪明的秘诀</h4>
-                        <p>A*算法每次都选择<strong>f值最小</strong>的格子来探索，这样就能又快又准地找到最短路径！</p>
+                        <p>A*算法每次都选择<strong>f值最小</strong>的格子来探索。因为h*是乐观估计，所以不会错过真正的最短路径！</p>
                     </div>
                 </div>
 
@@ -907,7 +924,7 @@
                         </div>
                         <div class="stat-item">
                             <div class="stat-value" id="pathLength">-</div>
-                            <div class="stat-label">路径���度</div>
+                            <div class="stat-label">路径长度</div>
                         </div>
                         <div class="stat-item">
                             <div class="stat-value" id="openCount">0</div>
@@ -1210,29 +1227,29 @@
                         cell.classList.add('start');
                         cell.innerHTML = `
                             <span class="cell-icon">🤖</span>
-                            ${node.g !== Infinity ? `<span class="cell-values">f=${node.f}<br>${node.g}+${node.h}</span>` : ''}
+                            ${node.g !== Infinity ? `<span class="cell-values">f≈${node.f}<br>g${node.g}+h*${node.h}</span>` : ''}
                         `;
                     } else if (node.isEnd) {
                         cell.classList.add('end');
                         cell.innerHTML = `
                             <span class="cell-icon">🏠</span>
-                            ${node.g !== Infinity ? `<span class="cell-values">f=${node.f}<br>${node.g}+${node.h}</span>` : ''}
+                            ${node.g !== Infinity ? `<span class="cell-values">f≈${node.f}<br>g${node.g}+h*${node.h}</span>` : ''}
                         `;
                     } else if (node === currentNode) {
                         cell.classList.add('current');
                         cell.innerHTML = `
                             <span class="cell-icon">👀</span>
-                            <span class="cell-values">f=${node.f}<br>${node.g}+${node.h}</span>
+                            <span class="cell-values">f≈${node.f}<br>g${node.g}+h*${node.h}</span>
                         `;
                     } else if (closedList.includes(node)) {
                         cell.classList.add('closed');
                         cell.innerHTML = `
-                            <span class="cell-values" style="font-size: 0.7rem;">f=${node.f}<br>${node.g}+${node.h}</span>
+                            <span class="cell-values" style="font-size: 0.7rem;">f≈${node.f}<br>g${node.g}+h*${node.h}</span>
                         `;
                     } else if (openList.includes(node)) {
                         cell.classList.add('open');
                         cell.innerHTML = `
-                            <span class="cell-values" style="font-size: 0.7rem;">f=${node.f}<br>${node.g}+${node.h}</span>
+                            <span class="cell-values" style="font-size: 0.7rem;">f≈${node.f}<br>g${node.g}+h*${node.h}</span>
                         `;
                     }
 
@@ -1312,7 +1329,8 @@
             renderGrid();
             updateStats();
             updateStepInfo('算法已初始化 🚀',
-                `起点的值：g=0（还没走）, h=${start.h}（预计还要走${start.h}步）, f=${start.f}。
+                `起点的值：g=0（还没走）, h*≈${start.h}（乐观估计还要走${start.h}步）, f≈${start.f}。
+                <br>💡 h*是假设没有障碍物时的最短距离，实际可能更远哦！
                 <br>点击"下一步"继续！`);
         }
 
@@ -1363,15 +1381,15 @@
             updateStats();
 
             // Generate step explanation
-            let explanation = `正在探索位置 (${currentNode.x}, ${currentNode.y})，它的f值是 ${currentNode.f}（最小的！）`;
+            let explanation = `正在探索位置 (${currentNode.x}, ${currentNode.y})，它的f值≈${currentNode.f}（估计最小！）`;
 
             if (newNodesAdded.length > 0) {
-                explanation += `<br>发现了 ${newNodesAdded.length} 个新的可以走的格子，加入待探索列表。`;
+                explanation += `<br>发现了 ${newNodesAdded.length} 个新的可以走的格子，计算它们的h*估计值并加入待探索列表。`;
             }
 
             if (openList.length > 0) {
                 const best = [...openList].sort((a, b) => a.f - b.f)[0];
-                explanation += `<br>下一步会探索f值最小的格子 (${best.x}, ${best.y})，f=${best.f}`;
+                explanation += `<br>下一步会探索f值最小的格子 (${best.x}, ${best.y})，f≈${best.f}`;
             }
 
             updateStepInfo(`第 ${stepCount} 步`, explanation);
@@ -1397,7 +1415,7 @@
                         cell.className = 'cell path';
                         cell.innerHTML = `
                             <span class="cell-icon">⭐</span>
-                            <span class="cell-values">f=${pathNode.f}<br>${pathNode.g}+${pathNode.h}</span>
+                            <span class="cell-values">f≈${pathNode.f}<br>g${pathNode.g}+h*${pathNode.h}</span>
                         `;
                     }
                     i++;
