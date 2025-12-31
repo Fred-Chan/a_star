@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌟 寻路小达人 - A*算法探险</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-light: #818cf8;
+            --secondary: #f59e0b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --bg-light: #faf5ff;
+            --bg-dark: #1e1b4b;
+            --text-light: #1e1b4b;
+            --text-dark: #f5f3ff;
+            --card-light: #ffffff;
+            --card-dark: #312e81;
+            --cell-empty: #e0e7ff;
+            --cell-empty-dark: #3730a3;
+            --cell-wall: #475569;
+            --cell-wall-dark: #1e293b;
+            --cell-start: #22c55e;
+            --cell-end: #ef4444;
+            --cell-open: #fbbf24;
+            --cell-closed: #a78bfa;
+            --cell-path: #34d399;
+            --cell-current: #f472b6;
+        }
+
+        .dark {
+            --bg: var(--bg-dark);
+            --text: var(--text-dark);
+            --card: var(--card-dark);
+            --cell-empty-current: var(--cell-empty-dark);
+        }
+
+        :root:not(.dark) {
+            --bg: var(--bg-light);
+            --text: var(--text-light);
+            --card: var(--card-light);
+            --cell-empty-current: var(--cell-empty);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            transition: background 0.3s, color 0.3s;
+            overflow-x: hidden;
+        }
+
+        .bg-pattern {
+            position: fixed;
+            inset: 0;
+            background-image:
+                radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(245, 158, 11, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(16, 185, 129, 0.08) 0%, transparent 40%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            animation: slideDown 0.8s ease-out;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            font-size: clamp(1.8rem, 5vw, 2.5rem);
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.8;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        @media (min-width: 900px) {
+            .main-layout {
+                grid-template-columns: 1fr 320px;
+            }
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(99, 102, 241, 0.15);
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 12px;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success), #34d399);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, var(--secondary), #fbbf24);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger), #f87171);
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .difficulty-selector {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .diff-btn {
+            padding: 10px 20px;
+            border: 3px solid transparent;
+            border-radius: 30px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: var(--cell-empty-current);
+        }
+
+        .diff-btn.active {
+            border-color: var(--primary);
+            background: var(--primary);
+            color: white;
+        }
+
+        .diff-btn:hover:not(.active) {
+            border-color: var(--primary-light);
+        }
+
+        .grid-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            padding: 10px 0;
+        }
+
+        .grid {
+            display: grid;
+            gap: 3px;
+            background: rgba(99, 102, 241, 0.2);
+            padding: 10px;
+            border-radius: 15px;
+        }
+
+        .cell {
+            width: clamp(35px, 8vw, 55px);
+            height: clamp(35px, 8vw, 55px);
+            background: var(--cell-empty-current);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cell:hover {
+            transform: scale(1.05);
+            z-index: 10;
+        }
+
+        .cell.wall {
+            background: var(--cell-wall);
+        }
+
+        .dark .cell.wall {
+            background: var(--cell-wall-dark);
+        }
+
+        .cell.start {
+            background: linear-gradient(135deg, var(--cell-start), #4ade80);
+        }
+
+        .cell.end {
+            background: linear-gradient(135deg, var(--cell-end), #f87171);
+        }
+
+        .cell.open {
+            background: linear-gradient(135deg, var(--cell-open), #fcd34d);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.5); }
+            50% { box-shadow: 0 0 0 8px rgba(251, 191, 36, 0); }
+        }
+
+        .cell.closed {
+            background: linear-gradient(135deg, var(--cell-closed), #c4b5fd);
+        }
+
+        .cell.path {
+            background: linear-gradient(135deg, var(--cell-path), #6ee7b7);
+            animation: pathGlow 0.5s ease-out;
+        }
+
+        @keyframes pathGlow {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .cell.current {
+            background: linear-gradient(135deg, var(--cell-current), #f9a8d4);
+            animation: currentPulse 0.5s ease-out;
+        }
+
+        @keyframes currentPulse {
+            0% { box-shadow: 0 0 0 0 rgba(244, 114, 182, 0.7); }
+            100% { box-shadow: 0 0 0 10px rgba(244, 114, 182, 0); }
+        }
+
+        .cell-icon {
+            font-size: 1.2rem;
+            margin-bottom: 2px;
+        }
+
+        .cell-values {
+            font-size: 0.55rem;
+            opacity: 0.9;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .cell.start .cell-values,
+        .cell.end .cell-values {
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .sidebar h3 {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+
+        .legend-color {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            flex-shrink: 0;
+        }
+
+        .info-box {
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .info-box h4 {
+            font-size: 1rem;
+            margin-bottom: 8px;
+            color: var(--primary);
+        }
+
+        .info-box p {
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .formula {
+            background: var(--card);
+            border: 2px dashed var(--primary);
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+
+        .formula span {
+            color: var(--primary);
+        }
+
+        .step-info {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            min-height: 80px;
+        }
+
+        .step-info h4 {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .step-counter {
+            background: rgba(255,255,255,0.2);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .stat-item {
+            background: rgba(99, 102, 241, 0.1);
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .speed-control label {
+            font-weight: 600;
+        }
+
+        .speed-control input[type="range"] {
+            flex: 1;
+            min-width: 100px;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--card);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            transform: scale(0.8);
+            transition: transform 0.3s;
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal h2 {
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+        }
+
+        .modal p {
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .modal .btn {
+            margin: 5px;
+        }
+
+        .success-icon {
+            font-size: 4rem;
+            margin-bottom: 15px;
+            animation: bounce 1s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .thinking-bubble {
+            position: absolute;
+            background: white;
+            color: #333;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 100;
+            white-space: nowrap;
+            animation: bubbleIn 0.3s ease-out;
+        }
+
+        @keyframes bubbleIn {
+            from { opacity: 0; transform: scale(0.5) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .help-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+            z-index: 100;
+            transition: transform 0.3s;
+        }
+
+        .help-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        /* Mode Toggle Styles */
+        .mode-toggle {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .mode-btn {
+            padding: 10px 20px;
+            border: 3px solid var(--cell-empty-current);
+            border-radius: 30px;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: var(--cell-empty-current);
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mode-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .mode-btn:hover:not(.active) {
+            border-color: var(--primary-light);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        /* Edit Toolbar Styles */
+        .edit-toolbar {
+            background: rgba(99, 102, 241, 0.1);
+            border: 2px dashed var(--primary);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+            display: none;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .edit-toolbar.visible {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .toolbar-title {
+            font-weight: 700;
+            font-size: 1rem;
+            margin-bottom: 12px;
+            color: var(--primary);
+            text-align: center;
+        }
+
+        .tool-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .tool-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 10px 15px;
+            border: 3px solid transparent;
+            border-radius: 12px;
+            background: var(--card);
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 70px;
+        }
+
+        .tool-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .tool-btn.active {
+            border-color: var(--primary);
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(129, 140, 248, 0.2));
+        }
+
+        .tool-icon {
+            font-size: 1.5rem;
+        }
+
+        .tool-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .edit-hint {
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--primary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            display: block;
+            margin: 0 auto;
+        }
+
+        /* Edit mode cell styles */
+        .edit-mode .cell {
+            cursor: crosshair;
+        }
+
+        .edit-mode .cell:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.5);
+        }
+
+        .cell.preview-wall {
+            background: rgba(71, 85, 105, 0.5) !important;
+        }
+
+        .cell.preview-start {
+            background: rgba(34, 197, 94, 0.5) !important;
+        }
+
+        .cell.preview-end {
+            background: rgba(239, 68, 68, 0.5) !important;
+        }
+
+        .cell.preview-eraser {
+            background: rgba(255, 255, 255, 0.5) !important;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--danger);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: 600;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            z-index: 1001;
+            opacity: 0;
+            transition: all 0.3s;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            background: var(--success);
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            opacity: 0.6;
+            font-size: 0.9rem;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+
+            .card {
+                padding: 15px;
+            }
+
+            .controls {
+                gap: 8px;
+            }
+
+            .btn {
+                padding: 10px 15px;
+                font-size: 0.9rem;
+            }
+
+            .legend {
+                grid-template-columns: 1fr;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-pattern"></div>
+
+    <div class="container">
+        <header>
+            <h1>🌟 寻路小达人 - A*算法探险</h1>
+            <p class="subtitle">跟着小机器人学习最聪明的寻路方法！</p>
+        </header>
+
+        <div class="main-layout">
+            <div class="card game-area">
+                <div class="difficulty-selector">
+                    <button class="diff-btn active" data-level="easy">🌱 简单 (5×5)</button>
+                    <button class="diff-btn" data-level="medium">🌿 中等 (7×7)</button>
+                    <button class="diff-btn" data-level="hard">🌳 困难 (9×9)</button>
+                </div>
+
+                <!-- Edit Mode Toggle -->
+                <div class="mode-toggle">
+                    <button class="mode-btn active" id="playModeBtn">
+                        <i class="fas fa-play-circle"></i> 演示模式
+                    </button>
+                    <button class="mode-btn" id="editModeBtn">
+                        <i class="fas fa-edit"></i> 编辑模式
+                    </button>
+                </div>
+
+                <!-- Edit Toolbar -->
+                <div class="edit-toolbar" id="editToolbar">
+                    <div class="toolbar-title"><i class="fas fa-tools"></i> 编辑工具</div>
+                    <div class="tool-buttons">
+                        <button class="tool-btn active" data-tool="wall" title="放置/移除障碍物">
+                            <span class="tool-icon">🧱</span>
+                            <span class="tool-label">障碍物</span>
+                        </button>
+                        <button class="tool-btn" data-tool="start" title="设置起点">
+                            <span class="tool-icon">🤖</span>
+                            <span class="tool-label">起点</span>
+                        </button>
+                        <button class="tool-btn" data-tool="end" title="设置终点">
+                            <span class="tool-icon">🏠</span>
+                            <span class="tool-label">终点</span>
+                        </button>
+                        <button class="tool-btn" data-tool="eraser" title="橡皮擦">
+                            <span class="tool-icon">🧹</span>
+                            <span class="tool-label">橡皮擦</span>
+                        </button>
+                    </div>
+                    <div class="edit-hint">
+                        <i class="fas fa-info-circle"></i>
+                        <span id="editHintText">点击或拖动来放置/移除障碍物</span>
+                    </div>
+                    <button class="btn btn-danger btn-small" id="clearAllBtn">
+                        <i class="fas fa-trash"></i> 清空障碍物
+                    </button>
+                </div>
+
+                <div class="controls">
+                    <button class="btn btn-secondary" id="newPuzzle">
+                        <i class="fas fa-dice"></i> 新题目
+                    </button>
+                    <button class="btn btn-success" id="startBtn">
+                        <i class="fas fa-play"></i> 开始演示
+                    </button>
+                    <button class="btn btn-primary" id="stepBtn" disabled>
+                        <i class="fas fa-step-forward"></i> 下一步
+                    </button>
+                    <button class="btn btn-danger" id="resetBtn">
+                        <i class="fas fa-redo"></i> 重置
+                    </button>
+                </div>
+
+                <div class="grid-container">
+                    <div class="grid" id="grid"></div>
+                </div>
+
+                <div class="step-info" id="stepInfo">
+                    <h4><i class="fas fa-lightbulb"></i> 准备开始</h4>
+                    <p>点击"开始演示"，然后点击"下一步"来逐步观察A*算法是如何找到最短路径的！</p>
+                </div>
+
+                <div class="speed-control">
+                    <label><i class="fas fa-tachometer-alt"></i> 演示速度:</label>
+                    <input type="range" id="speedSlider" min="100" max="1500" value="800">
+                    <span id="speedLabel">中速</span>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="card">
+                    <h3><i class="fas fa-map-signs"></i> 图例说明</h3>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: linear-gradient(135deg, #22c55e, #4ade80);"></div>
+                            <span>🤖 起点</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: linear-gradient(135deg, #ef4444, #f87171);"></div>
+                            <span>🏠 终点</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #475569;"></div>
+                            <span>🧱 障碍物</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: linear-gradient(135deg, #fbbf24, #fcd34d);"></div>
+                            <span>📋 待探索</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: linear-gradient(135deg, #a78bfa, #c4b5fd);"></div>
+                            <span>✅ 已探索</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: linear-gradient(135deg, #f472b6, #f9a8d4);"></div>
+                            <span>👀 当前位置</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: linear-gradient(135deg, #34d399, #6ee7b7);"></div>
+                            <span>⭐ 最短路径</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3><i class="fas fa-brain"></i> A*算法小课堂</h3>
+                    <div class="info-box">
+                        <h4>🎯 核心公式</h4>
+                        <div class="formula">
+                            <span>f</span> = <span>g</span> + <span>h</span>
+                        </div>
+                        <p>
+                            <strong>g值</strong>：从起点走到这里花了多少步<br>
+                            <strong>h值</strong>：猜测从这里到终点还要走多少步<br>
+                            <strong>f值</strong>：总共预计要走多少步
+                        </p>
+                    </div>
+                    <div class="info-box">
+                        <h4>💡 聪明的秘诀</h4>
+                        <p>A*算法每次都选择<strong>f值最小</strong>的格子来探索，这样就能又快又准地找到最短路径！</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3><i class="fas fa-chart-bar"></i> 统计数据</h3>
+                    <div class="stats">
+                        <div class="stat-item">
+                            <div class="stat-value" id="stepsCount">0</div>
+                            <div class="stat-label">探索步数</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="pathLength">-</div>
+                            <div class="stat-label">路径���度</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="openCount">0</div>
+                            <div class="stat-label">待探索</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="closedCount">0</div>
+                            <div class="stat-label">已探索</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>🎮 通过玩耍学习人工智能的基础知识 | A*算法探险</p>
+        </footer>
+    </div>
+
+    <!-- Success Modal -->
+    <div class="modal-overlay" id="successModal">
+        <div class="modal">
+            <div class="success-icon">🎉</div>
+            <h2>太棒了！</h2>
+            <p id="successMessage">机器人找到了最短路径！</p>
+            <button class="btn btn-primary" onclick="closeModal()">
+                <i class="fas fa-thumbs-up"></i> 继续探索
+            </button>
+            <button class="btn btn-secondary" onclick="closeModal(); generateNewPuzzle();">
+                <i class="fas fa-dice"></i> 新题目
+            </button>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div class="modal-overlay" id="helpModal">
+        <div class="modal">
+            <h2>🤔 如何使用？</h2>
+            <p style="text-align: left;">
+                <strong>📺 演示模式</strong><br>
+                1️⃣ 选择难度级别<br>
+                2️⃣ 点击"新题目"生成迷宫<br>
+                3️⃣ 点击"开始演示"初始化算法<br>
+                4️⃣ 点击"下一步"观察每一步<br>
+                5️⃣ 观察格子上的数字：<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;• 上面的数字是 <strong>f值</strong><br>
+                &nbsp;&nbsp;&nbsp;&nbsp;• 下面是 <strong>g+h</strong> 的分解<br><br>
+                <strong>✏️ 编辑模式</strong><br>
+                1️⃣ 点击"编辑模式"按钮<br>
+                2️⃣ 选择工具：<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;• 🧱 障碍物：点击放置/移除<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;• 🤖 起点：点击设置新起点<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;• 🏠 终点：点击设置新终点<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;• 🧹 橡皮擦：清除障碍物<br>
+                3️⃣ 拖动可以连续放置障碍物<br>
+                4️⃣ 编辑完成后切回演示模式
+            </p>
+            <button class="btn btn-primary" onclick="closeHelpModal()">
+                <i class="fas fa-check"></i> 明白了！
+            </button>
+        </div>
+    </div>
+
+    <button class="help-toggle" onclick="showHelpModal()">
+        <i class="fas fa-question"></i>
+    </button>
+
+    <!-- Toast Container -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // Dark mode detection
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        // Game state
+        let gridSize = 5;
+        let grid = [];
+        let start = null;
+        let end = null;
+        let openList = [];
+        let closedList = [];
+        let currentNode = null;
+        let isRunning = false;
+        let isComplete = false;
+        let stepCount = 0;
+        let animationSpeed = 800;
+        let isEditMode = false;
+        let currentTool = 'wall';
+        let isMouseDown = false;
+
+        // DOM elements
+        const gridEl = document.getElementById('grid');
+        const stepInfo = document.getElementById('stepInfo');
+        const startBtn = document.getElementById('startBtn');
+        const stepBtn = document.getElementById('stepBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const newPuzzleBtn = document.getElementById('newPuzzle');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedLabel = document.getElementById('speedLabel');
+
+        // Difficulty settings
+        const difficulties = {
+            easy: { size: 5, walls: 4 },
+            medium: { size: 7, walls: 10 },
+            hard: { size: 9, walls: 18 }
+        };
+
+        let currentDifficulty = 'easy';
+
+        // Initialize
+        document.querySelectorAll('.diff-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentDifficulty = btn.dataset.level;
+                generateNewPuzzle();
+            });
+        });
+
+        speedSlider.addEventListener('input', () => {
+            animationSpeed = 1600 - parseInt(speedSlider.value);
+            const labels = ['很慢', '慢速', '中速', '快速', '很快'];
+            const index = Math.floor((parseInt(speedSlider.value) - 100) / 350);
+            speedLabel.textContent = labels[Math.min(index, 4)];
+        });
+
+        startBtn.addEventListener('click', initializeAlgorithm);
+        stepBtn.addEventListener('click', performStep);
+        resetBtn.addEventListener('click', resetGrid);
+        newPuzzleBtn.addEventListener('click', generateNewPuzzle);
+
+        // Edit mode elements
+        const playModeBtn = document.getElementById('playModeBtn');
+        const editModeBtn = document.getElementById('editModeBtn');
+        const editToolbar = document.getElementById('editToolbar');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        const editHintText = document.getElementById('editHintText');
+        const toastEl = document.getElementById('toast');
+
+        // Edit mode event listeners
+        playModeBtn.addEventListener('click', () => setEditMode(false));
+        editModeBtn.addEventListener('click', () => setEditMode(true));
+        clearAllBtn.addEventListener('click', clearAllWalls);
+
+        // Tool selection
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentTool = btn.dataset.tool;
+                updateEditHint();
+            });
+        });
+
+        // Mouse/Touch events for dragging
+        document.addEventListener('mouseup', () => isMouseDown = false);
+        document.addEventListener('touchend', () => isMouseDown = false);
+
+        // Node class
+        class Node {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.g = Infinity;
+                this.h = 0;
+                this.f = Infinity;
+                this.parent = null;
+                this.isWall = false;
+                this.isStart = false;
+                this.isEnd = false;
+            }
+        }
+
+        // Generate puzzle
+        function generateNewPuzzle() {
+            const diff = difficulties[currentDifficulty];
+            gridSize = diff.size;
+            grid = [];
+            openList = [];
+            closedList = [];
+            currentNode = null;
+            isRunning = false;
+            isComplete = false;
+            stepCount = 0;
+
+            // Create empty grid
+            for (let y = 0; y < gridSize; y++) {
+                grid[y] = [];
+                for (let x = 0; x < gridSize; x++) {
+                    grid[y][x] = new Node(x, y);
+                }
+            }
+
+            // Set start and end
+            start = grid[0][0];
+            start.isStart = true;
+            end = grid[gridSize - 1][gridSize - 1];
+            end.isEnd = true;
+
+            // Generate walls ensuring path exists
+            let attempts = 0;
+            let wallsPlaced = 0;
+            const maxAttempts = 200;
+
+            while (wallsPlaced < diff.walls && attempts < maxAttempts) {
+                const x = Math.floor(Math.random() * gridSize);
+                const y = Math.floor(Math.random() * gridSize);
+
+                if (!grid[y][x].isStart && !grid[y][x].isEnd && !grid[y][x].isWall) {
+                    grid[y][x].isWall = true;
+
+                    // Check if path still exists
+                    if (!pathExists()) {
+                        grid[y][x].isWall = false;
+                    } else {
+                        wallsPlaced++;
+                    }
+                }
+                attempts++;
+            }
+
+            renderGrid();
+            updateStats();
+            updateStepInfo('准备开始', '点击"开始演示"，然后点击"下一步"来逐步观察A*算法是如何找到最短路径的！');
+
+            startBtn.disabled = false;
+            stepBtn.disabled = true;
+        }
+
+        // Simple BFS to check if path exists
+        function pathExists() {
+            const visited = new Set();
+            const queue = [[start.x, start.y]];
+            visited.add(`${start.x},${start.y}`);
+
+            while (queue.length > 0) {
+                const [x, y] = queue.shift();
+
+                if (x === end.x && y === end.y) return true;
+
+                const neighbors = getNeighbors(grid[y][x]);
+                for (const neighbor of neighbors) {
+                    const key = `${neighbor.x},${neighbor.y}`;
+                    if (!visited.has(key) && !neighbor.isWall) {
+                        visited.add(key);
+                        queue.push([neighbor.x, neighbor.y]);
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Get neighbors (4-directional)
+        function getNeighbors(node) {
+            const neighbors = [];
+            const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // Up, Right, Down, Left
+
+            for (const [dx, dy] of dirs) {
+                const nx = node.x + dx;
+                const ny = node.y + dy;
+
+                if (nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize) {
+                    neighbors.push(grid[ny][nx]);
+                }
+            }
+            return neighbors;
+        }
+
+        // Manhattan distance heuristic
+        function heuristic(node) {
+            return Math.abs(node.x - end.x) + Math.abs(node.y - end.y);
+        }
+
+        // Render grid
+        function renderGrid() {
+            gridEl.innerHTML = '';
+            gridEl.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+
+            for (let y = 0; y < gridSize; y++) {
+                for (let x = 0; x < gridSize; x++) {
+                    const node = grid[y][x];
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.x = x;
+                    cell.dataset.y = y;
+
+                    if (node.isWall) {
+                        cell.classList.add('wall');
+                        cell.innerHTML = '<span class="cell-icon">🧱</span>';
+                    } else if (node.isStart) {
+                        cell.classList.add('start');
+                        cell.innerHTML = `
+                            <span class="cell-icon">🤖</span>
+                            ${node.g !== Infinity ? `<span class="cell-values">f=${node.f}<br>${node.g}+${node.h}</span>` : ''}
+                        `;
+                    } else if (node.isEnd) {
+                        cell.classList.add('end');
+                        cell.innerHTML = `
+                            <span class="cell-icon">🏠</span>
+                            ${node.g !== Infinity ? `<span class="cell-values">f=${node.f}<br>${node.g}+${node.h}</span>` : ''}
+                        `;
+                    } else if (node === currentNode) {
+                        cell.classList.add('current');
+                        cell.innerHTML = `
+                            <span class="cell-icon">👀</span>
+                            <span class="cell-values">f=${node.f}<br>${node.g}+${node.h}</span>
+                        `;
+                    } else if (closedList.includes(node)) {
+                        cell.classList.add('closed');
+                        cell.innerHTML = `
+                            <span class="cell-values" style="font-size: 0.7rem;">f=${node.f}<br>${node.g}+${node.h}</span>
+                        `;
+                    } else if (openList.includes(node)) {
+                        cell.classList.add('open');
+                        cell.innerHTML = `
+                            <span class="cell-values" style="font-size: 0.7rem;">f=${node.f}<br>${node.g}+${node.h}</span>
+                        `;
+                    }
+
+                    // Add edit mode event listeners
+                    if (isEditMode) {
+                        // Mouse events
+                        cell.addEventListener('mousedown', (e) => {
+                            e.preventDefault();
+                            isMouseDown = true;
+                            handleCellEdit(x, y);
+                        });
+                        cell.addEventListener('mouseenter', () => {
+                            handleCellDrag(x, y);
+                        });
+
+                        // Touch events
+                        cell.addEventListener('touchstart', (e) => {
+                            e.preventDefault();
+                            isMouseDown = true;
+                            handleCellEdit(x, y);
+                        }, { passive: false });
+                        cell.addEventListener('touchmove', (e) => {
+                            e.preventDefault();
+                            const touch = e.touches[0];
+                            const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                            if (element && element.classList.contains('cell')) {
+                                const cx = parseInt(element.dataset.x);
+                                const cy = parseInt(element.dataset.y);
+                                handleCellDrag(cx, cy);
+                            }
+                        }, { passive: false });
+
+                        // Add preview class on hover
+                        cell.addEventListener('mouseenter', () => {
+                            if (!node.isStart && !node.isEnd && !node.isWall) {
+                                cell.classList.add(`preview-${currentTool}`);
+                            }
+                        });
+                        cell.addEventListener('mouseleave', () => {
+                            cell.classList.remove('preview-wall', 'preview-start', 'preview-end', 'preview-eraser');
+                        });
+                    }
+
+                    gridEl.appendChild(cell);
+                }
+            }
+        }
+
+        // Initialize A* algorithm
+        function initializeAlgorithm() {
+            // Reset node values
+            for (let y = 0; y < gridSize; y++) {
+                for (let x = 0; x < gridSize; x++) {
+                    grid[y][x].g = Infinity;
+                    grid[y][x].h = 0;
+                    grid[y][x].f = Infinity;
+                    grid[y][x].parent = null;
+                }
+            }
+
+            openList = [];
+            closedList = [];
+            currentNode = null;
+            stepCount = 0;
+            isComplete = false;
+
+            // Initialize start node
+            start.g = 0;
+            start.h = heuristic(start);
+            start.f = start.g + start.h;
+            openList.push(start);
+
+            isRunning = true;
+            startBtn.disabled = true;
+            stepBtn.disabled = false;
+
+            renderGrid();
+            updateStats();
+            updateStepInfo('算法已初始化 🚀',
+                `起点的值：g=0（还没走）, h=${start.h}（预计还要走${start.h}步）, f=${start.f}。
+                <br>点击"下一步"继续！`);
+        }
+
+        // Perform one step of A*
+        function performStep() {
+            if (isComplete || openList.length === 0) return;
+
+            stepCount++;
+
+            // Find node with lowest f value
+            openList.sort((a, b) => a.f - b.f || a.h - b.h);
+            currentNode = openList.shift();
+            closedList.push(currentNode);
+
+            // Check if we reached the goal
+            if (currentNode === end) {
+                isComplete = true;
+                showPath();
+                return;
+            }
+
+            // Get neighbors
+            const neighbors = getNeighbors(currentNode);
+            let newNodesAdded = [];
+            let updatedNodes = [];
+
+            for (const neighbor of neighbors) {
+                if (neighbor.isWall || closedList.includes(neighbor)) continue;
+
+                const tentativeG = currentNode.g + 1;
+
+                if (tentativeG < neighbor.g) {
+                    neighbor.parent = currentNode;
+                    neighbor.g = tentativeG;
+                    neighbor.h = heuristic(neighbor);
+                    neighbor.f = neighbor.g + neighbor.h;
+
+                    if (!openList.includes(neighbor)) {
+                        openList.push(neighbor);
+                        newNodesAdded.push(neighbor);
+                    } else {
+                        updatedNodes.push(neighbor);
+                    }
+                }
+            }
+
+            renderGrid();
+            updateStats();
+
+            // Generate step explanation
+            let explanation = `正在探索位置 (${currentNode.x}, ${currentNode.y})，它的f值是 ${currentNode.f}（最小的！）`;
+
+            if (newNodesAdded.length > 0) {
+                explanation += `<br>发现了 ${newNodesAdded.length} 个新的可以走的格子，加入待探索列表。`;
+            }
+
+            if (openList.length > 0) {
+                const best = [...openList].sort((a, b) => a.f - b.f)[0];
+                explanation += `<br>下一步会探索f值最小的格子 (${best.x}, ${best.y})，f=${best.f}`;
+            }
+
+            updateStepInfo(`第 ${stepCount} 步`, explanation);
+        }
+
+        // Show final path
+        function showPath() {
+            const path = [];
+            let node = end;
+
+            while (node) {
+                path.unshift(node);
+                node = node.parent;
+            }
+
+            // Animate path
+            let i = 0;
+            const animatePath = () => {
+                if (i < path.length) {
+                    const pathNode = path[i];
+                    const cell = gridEl.querySelector(`[data-x="${pathNode.x}"][data-y="${pathNode.y}"]`);
+                    if (cell && !pathNode.isStart && !pathNode.isEnd) {
+                        cell.className = 'cell path';
+                        cell.innerHTML = `
+                            <span class="cell-icon">⭐</span>
+                            <span class="cell-values">f=${pathNode.f}<br>${pathNode.g}+${pathNode.h}</span>
+                        `;
+                    }
+                    i++;
+                    setTimeout(animatePath, 150);
+                } else {
+                    // Show success modal
+                    document.getElementById('pathLength').textContent = path.length - 1;
+                    document.getElementById('successMessage').textContent =
+                        `机器人用了 ${stepCount} 步探索，找到了长度为 ${path.length - 1} 的最短路径！`;
+                    document.getElementById('successModal').classList.add('active');
+
+                    updateStepInfo('🎉 找到最短路径！',
+                        `经过 ${stepCount} 步探索，找到了从起点到终点的最短路径！
+                        <br>路径长度：${path.length - 1} 步`);
+                }
+            };
+
+            animatePath();
+            stepBtn.disabled = true;
+        }
+
+        // Reset grid
+        function resetGrid() {
+            for (let y = 0; y < gridSize; y++) {
+                for (let x = 0; x < gridSize; x++) {
+                    grid[y][x].g = Infinity;
+                    grid[y][x].h = 0;
+                    grid[y][x].f = Infinity;
+                    grid[y][x].parent = null;
+                }
+            }
+
+            openList = [];
+            closedList = [];
+            currentNode = null;
+            isRunning = false;
+            isComplete = false;
+            stepCount = 0;
+
+            renderGrid();
+            updateStats();
+            updateStepInfo('已重置 🔄', '点击"开始演示"重新开始，或点击"新题目"生成新的迷宫！');
+
+            startBtn.disabled = false;
+            stepBtn.disabled = true;
+        }
+
+        // Update statistics
+        function updateStats() {
+            document.getElementById('stepsCount').textContent = stepCount;
+            document.getElementById('openCount').textContent = openList.length;
+            document.getElementById('closedCount').textContent = closedList.length;
+        }
+
+        // Update step info
+        function updateStepInfo(title, message) {
+            stepInfo.innerHTML = `
+                <h4><i class="fas fa-lightbulb"></i> ${title}
+                    ${stepCount > 0 ? `<span class="step-counter">步骤 ${stepCount}</span>` : ''}
+                </h4>
+                <p>${message}</p>
+            `;
+        }
+
+        // Modal functions
+        function closeModal() {
+            document.getElementById('successModal').classList.remove('active');
+        }
+
+        function showHelpModal() {
+            document.getElementById('helpModal').classList.add('active');
+        }
+
+        function closeHelpModal() {
+            document.getElementById('helpModal').classList.remove('active');
+        }
+
+        // Edit mode functions
+        function setEditMode(enabled) {
+            isEditMode = enabled;
+
+            // Update buttons
+            playModeBtn.classList.toggle('active', !enabled);
+            editModeBtn.classList.toggle('active', enabled);
+
+            // Show/hide toolbar
+            editToolbar.classList.toggle('visible', enabled);
+
+            // Update grid class
+            document.querySelector('.grid-container').classList.toggle('edit-mode', enabled);
+
+            // Reset algorithm state when entering edit mode
+            if (enabled && isRunning) {
+                resetGrid();
+            }
+
+            // Update controls visibility
+            document.querySelector('.controls').style.display = enabled ? 'none' : 'flex';
+            document.querySelector('.step-info').style.display = enabled ? 'none' : 'block';
+            document.querySelector('.speed-control').style.display = enabled ? 'none' : 'flex';
+
+            renderGrid();
+        }
+
+        function updateEditHint() {
+            const hints = {
+                wall: '点击或拖动来放置/移除障碍物',
+                start: '点击空白格子来设置新的起点',
+                end: '点击空白格子来设置新的终点',
+                eraser: '点击或拖动来清除障碍物'
+            };
+            editHintText.textContent = hints[currentTool];
+        }
+
+        function clearAllWalls() {
+            for (let y = 0; y < gridSize; y++) {
+                for (let x = 0; x < gridSize; x++) {
+                    grid[y][x].isWall = false;
+                }
+            }
+            renderGrid();
+            showToast('已清空所有障碍物！', 'success');
+        }
+
+        function showToast(message, type = 'error') {
+            toastEl.textContent = message;
+            toastEl.className = 'toast ' + type;
+            setTimeout(() => toastEl.classList.add('show'), 10);
+            setTimeout(() => toastEl.classList.remove('show'), 2500);
+        }
+
+        function handleCellEdit(x, y) {
+            if (!isEditMode) return;
+
+            const node = grid[y][x];
+
+            switch (currentTool) {
+                case 'wall':
+                    if (!node.isStart && !node.isEnd) {
+                        node.isWall = !node.isWall;
+                    }
+                    break;
+
+                case 'start':
+                    if (!node.isWall && !node.isEnd) {
+                        // Remove old start
+                        start.isStart = false;
+                        // Set new start
+                        node.isStart = true;
+                        start = node;
+                    }
+                    break;
+
+                case 'end':
+                    if (!node.isWall && !node.isStart) {
+                        // Remove old end
+                        end.isEnd = false;
+                        // Set new end
+                        node.isEnd = true;
+                        end = node;
+                    }
+                    break;
+
+                case 'eraser':
+                    if (!node.isStart && !node.isEnd) {
+                        node.isWall = false;
+                    }
+                    break;
+            }
+
+            // Check if path still exists
+            if (!pathExists()) {
+                // Revert the change
+                if (currentTool === 'wall' && node.isWall) {
+                    node.isWall = false;
+                    showToast('⚠️ 这样放会堵死路哦！', 'error');
+                }
+            }
+
+            renderGrid();
+        }
+
+        function handleCellDrag(x, y) {
+            if (!isEditMode || !isMouseDown) return;
+
+            const node = grid[y][x];
+
+            // Only wall and eraser support dragging
+            if (currentTool === 'wall') {
+                if (!node.isStart && !node.isEnd && !node.isWall) {
+                    node.isWall = true;
+                    if (!pathExists()) {
+                        node.isWall = false;
+                    } else {
+                        renderGrid();
+                    }
+                }
+            } else if (currentTool === 'eraser') {
+                if (!node.isStart && !node.isEnd && node.isWall) {
+                    node.isWall = false;
+                    renderGrid();
+                }
+            }
+        }
+
+        // Initialize on load
+        generateNewPuzzle();
+    </script>
+</body>
+</html>
